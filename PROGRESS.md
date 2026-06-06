@@ -20,7 +20,9 @@
 - ✅ 单平台也能用：只配 Claude 或只配 Codex 时单列居中显示；某平台拉取失败回退缓存、不拖累另一个；导入 token 放宽成"有一个就能导"
 - ✅ 组件标题改幽默版「别问了还剩这么点🤏」
 - ✅ 面向陌生人文档（macOS）：README 重写 + SETUP 加常见问题 + LICENSE(MIT)；Win/Linux 标注欢迎 PR
-- ⬜ 上传 GitHub（用户决定时机）
+- ✅ 已开源：https://github.com/wgjuan2314/shuangzi-xubei （公开/MIT/署名小卷）
+- ✅ 项目定名「双子续杯」（仓库 slug 用拼音 shuangzi-xubei，GitHub 不支持中文名）
+- ✅ 截图裁剪去除家庭定位信息后再公开
 
 状态图例：⬜ 待办 / 🔄 进行中 / ✅ 完成 / ⛔ 阻塞
 

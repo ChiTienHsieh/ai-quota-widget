@@ -263,7 +263,7 @@ function buildWidget(platforms, updatedAt, offline) {
   let header = w.addStack();
   header.layoutHorizontally();
   header.centerAlignContent();
-  let title = header.addText("AI 额度");
+  let title = header.addText("别问了还剩这么点🤏");
   title.font = Font.boldSystemFont(13);
   title.textColor = Color.white();
   header.addSpacer();

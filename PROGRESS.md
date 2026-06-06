@@ -8,11 +8,11 @@
 |---|------|------|
 | 1 | 初始化项目 + 落库文档（PROJECT/PROGRESS/CLAUDE.md） | ✅ 完成 |
 | 2 | 验证 Claude + Codex 额度接口（curl 实测） | ✅ 完成 |
-| 3 | 实现 token 自动刷新流程 | ⬜ 待办 |
-| 4 | 编写 Scriptable 小组件脚本 | ⬜ 待办 |
-| 5 | 手机部署 + 端到端验证 | ⬜ 待办 |
-| 6 | 替换设计稿视觉层（等用户设计稿） | ⬜ 待办 |
-| 7 | 写 README + 截图打包 portfolio | ⬜ 待办 |
+| 3 | 实现 token 自动刷新流程 | ✅ 完成（实现，活账号未实测） |
+| 4 | 编写 Scriptable 小组件脚本 | ✅ 完成 |
+| 5 | 手机部署 + 端到端验证 | ⬜ 待办（需用户在手机操作） |
+| 6 | 替换设计稿视觉层（等用户设计稿） | ⬜ 待办（等设计稿） |
+| 7 | 写 README + 截图打包 portfolio | 🔄 README 完成，截图待部署后补 |
 
 状态图例：⬜ 待办 / 🔄 进行中 / ✅ 完成 / ⛔ 阻塞
 
@@ -25,5 +25,10 @@
   - Claude `oauth/usage`：`five_hour.utilization` / `seven_day.utilization`（已用%）+ `resets_at`
   - Codex `wham/usage`：`primary/secondary_window.used_percent` + `reset_at` + `plan_type`
   - token 来源：Claude 在 macOS Keychain `Claude Code-credentials`；Codex 在 `~/.codex/auth.json`
-- ⚠️ 结论：两接口都**不返回今日 token 总额**，只有百分比+重置时间 → 待用户决策今日token怎么处理
-- 下一步：待决策后写脚本
+- ⚠️ 结论：两接口都**不返回今日 token 总额**，只有百分比+重置时间
+- ✅ 用户决策：**去掉今日 token**，组件显示 5h%/周%/重置倒计时
+- ✅ 写完 `ai-quota-widget.js`（认证+刷新+双接口拉取+缓存+双列渲染），node --check 语法通过
+- ✅ 写完 `export-tokens.sh`（Mac 导出 token JSON），实测能正确读出两边 token
+- ✅ 写完 SETUP.md / README.md
+- ⚠️ token 刷新逻辑已实现，但**未在活账号实测**（调 refresh 会轮换 token，可能影响 Mac 上正在用的登录）；手机端 token 自然过期时会被验证，失败则重新导入
+- 下一步：用户在手机按 SETUP 部署 → 端到端验证 → 提供设计稿替换视觉层 → 补截图

@@ -21,14 +21,28 @@
 
 | 数据 | 接口 | 认证 | Mac关机可用 |
 |------|------|------|-----------|
-| Claude 5h%/周% + 重置 | `GET https://api.anthropic.com/api/oauth/usage` | `~/.claude/.credentials.json` OAuth token | ✅ |
-| Codex 5h%/周% + 重置 | `GET https://chatgpt.com/backend-api/wham/usage` | `~/.codex/auth.json` access_token | ✅ |
+| Claude 5h%/周% + 重置 | `GET https://api.anthropic.com/api/oauth/usage` | macOS Keychain `Claude Code-credentials` → `claudeAiOauth.accessToken` | ✅ |
+| Codex 5h%/周% + 重置 | `GET https://chatgpt.com/backend-api/wham/usage` | `~/.codex/auth.json` → `tokens.access_token` + `account_id` | ✅ |
 
 参考开源实现：`steipete/CodexBar`、`f-is-h/Usage4Claude`、`ohugonnot/claude-code-statusline`。
 
-### ⚠️ 两个待验证风险
+### ✅ 接口已实测确认（2026-06-06，均 HTTP 200）
+
+**Claude** `GET https://api.anthropic.com/api/oauth/usage`
+- Header：`Authorization: Bearer <token>`、`anthropic-beta: oauth-2025-04-20`
+- 返回：`five_hour.utilization`（已用%）、`five_hour.resets_at`（ISO8601）；`seven_day.utilization`、`seven_day.resets_at`
+- **剩余% = 100 − utilization**
+
+**Codex** `GET https://chatgpt.com/backend-api/wham/usage`
+- Header：`Authorization: Bearer <token>`、`chatgpt-account-id: <account_id>`
+- 返回：`plan_type`；`rate_limit.primary_window.{used_percent, reset_at(unix), reset_after_seconds, limit_window_seconds=18000(5h)}`；`secondary_window.{used_percent, reset_at, limit_window_seconds=604800(7d)}`
+- **剩余% = 100 − used_percent**
+
+两接口实测值与客户端 Settings 显示一致；均只需 token、Mac 关机可用。
+
+### ⚠️ 确认的限制
 1. **接口非官方**：随时可能变更；`/api/oauth/usage` 已知有限流（429），刷新间隔设 10-15 分钟。
-2. **「今日 token 总额」是否拿得到**：百分比接口不一定返回 token 计数。本地计数（Claude `stats-cache.json`、Codex `state_5.sqlite.tokens_used`）在 Mac 上，纯手机+Mac关机场景可能拿不到。执行第一步 curl 实测确认；拿不到则改为近似或暂时去掉，5h% 本身已反映今日消耗强度。
+2. **「今日 token 总额」云端拿不到**：两接口均不含 token 计数，只有百分比+重置时间。token 计数仅在 Mac 本地（Claude `stats-cache.json`、Codex `state_5.sqlite.tokens_used`），纯手机+Mac关机场景无法获取。→ 待用户决策：去掉 / 换成重置倒计时 / 接受 Mac 在线时才显示。
 
 ## 四、认证与 token 处理
 

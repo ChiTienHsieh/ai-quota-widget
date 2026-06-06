@@ -6,8 +6,8 @@
 
 | # | 任务 | 状态 |
 |---|------|------|
-| 1 | 初始化项目 + 落库文档（PROJECT/PROGRESS/CLAUDE.md） | 🔄 进行中 |
-| 2 | 验证 Claude + Codex 额度接口（curl 实测） | ⬜ 待办 |
+| 1 | 初始化项目 + 落库文档（PROJECT/PROGRESS/CLAUDE.md） | ✅ 完成 |
+| 2 | 验证 Claude + Codex 额度接口（curl 实测） | ✅ 完成 |
 | 3 | 实现 token 自动刷新流程 | ⬜ 待办 |
 | 4 | 编写 Scriptable 小组件脚本 | ⬜ 待办 |
 | 5 | 手机部署 + 端到端验证 | ⬜ 待办 |
@@ -21,4 +21,9 @@
 ### 2026-06-06
 - 创建项目目录 `/Users/suansuan/Documents/claude/ai-quota-widget/`，git init
 - 落库 PROJECT.md / PROGRESS.md / CLAUDE.md
-- 下一步：curl 实测两个额度接口，确认返回字段（尤其今日 token 是否可得）
+- ✅ 接口实测通过（均 HTTP 200）：
+  - Claude `oauth/usage`：`five_hour.utilization` / `seven_day.utilization`（已用%）+ `resets_at`
+  - Codex `wham/usage`：`primary/secondary_window.used_percent` + `reset_at` + `plan_type`
+  - token 来源：Claude 在 macOS Keychain `Claude Code-credentials`；Codex 在 `~/.codex/auth.json`
+- ⚠️ 结论：两接口都**不返回今日 token 总额**，只有百分比+重置时间 → 待用户决策今日token怎么处理
+- 下一步：待决策后写脚本

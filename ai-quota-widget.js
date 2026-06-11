@@ -31,22 +31,23 @@ function kcSet(key, obj) { Keychain.set(key, JSON.stringify(obj)); }
 // 期望剪贴板里是 export-tokens.sh 输出的 JSON：
 // { "claude": {accessToken, refreshToken, expiresAt}, "codex": {accessToken, refreshToken, accountId} }
 async function bootstrapIfNeeded() {
-  // 至少配置了一个平台就放行（支持只用 Claude 或只用 Codex）
-  if (kcGet(KC_CLAUDE)?.accessToken || kcGet(KC_CODEX)?.accessToken) return true;
-  let raw = Pasteboard.paste();
+  // 先看剪贴板里有没有合法 token JSON——有就「覆盖导入」，
+  // 这样 token 过期后重新导出粘贴再跑一次即可更新（即便 Keychain 已有旧 token）
   let parsed = null;
-  try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+  try { parsed = JSON.parse(Pasteboard.paste()); } catch (e) { parsed = null; }
   let imported = [];
   if (parsed?.claude?.accessToken) { kcSet(KC_CLAUDE, parsed.claude); imported.push("Claude"); }
   if (parsed?.codex?.accessToken) { kcSet(KC_CODEX, parsed.codex); imported.push("Codex"); }
   if (imported.length > 0) {
     let a = new Alert();
-    a.title = "导入成功";
-    a.message = `已导入：${imported.join(" + ")}。现在可以添加桌面组件了。`;
+    a.title = "已更新 token";
+    a.message = `已写入：${imported.join(" + ")}。回桌面长按组件刷新即可。`;
     a.addAction("好");
     await a.present();
     return true;
   }
+  // 剪贴板没有可导入内容：只要至少配置过一个平台就放行（正常运行，不打扰）
+  if (kcGet(KC_CLAUDE)?.accessToken || kcGet(KC_CODEX)?.accessToken) return true;
   let a = new Alert();
   a.title = "需要先导入 token";
   a.message = "请在 Mac 运行 export-tokens.sh，复制输出的 JSON 到本机剪贴板，再运行本脚本一次。";

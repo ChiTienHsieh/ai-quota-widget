@@ -31,28 +31,50 @@ function kcSet(key, obj) { Keychain.set(key, JSON.stringify(obj)); }
 // 期望剪贴板里是 export-tokens.sh 输出的 JSON：
 // { "claude": {accessToken, refreshToken, expiresAt}, "codex": {accessToken, refreshToken, accountId} }
 async function bootstrapIfNeeded() {
-  // 先看剪贴板里有没有合法 token JSON——有就「覆盖导入」，
-  // 这样 token 过期后重新导出粘贴再跑一次即可更新（即便 Keychain 已有旧 token）
-  let parsed = null;
-  try { parsed = JSON.parse(Pasteboard.paste()); } catch (e) { parsed = null; }
   let imported = [];
-  if (parsed?.claude?.accessToken) { kcSet(KC_CLAUDE, parsed.claude); imported.push("Claude"); }
-  if (parsed?.codex?.accessToken) { kcSet(KC_CODEX, parsed.codex); imported.push("Codex"); }
+
+  // 1) 优先从 iCloud 同步的 token 文件导入（绕开剪贴板，最可靠）
+  //    Mac 端把 aiquota-token.json 放进 Scriptable 的 iCloud 文件夹即自动同步过来
+  try {
+    let fm = FileManager.iCloud();
+    let p = fm.joinPath(fm.documentsDirectory(), "aiquota-token.json");
+    if (fm.fileExists(p)) {
+      if (!fm.isFileDownloaded(p)) await fm.downloadFileFromiCloud(p);
+      let parsed = JSON.parse(fm.readString(p));
+      if (parsed?.claude?.accessToken) { kcSet(KC_CLAUDE, parsed.claude); imported.push("Claude"); }
+      if (parsed?.codex?.accessToken) { kcSet(KC_CODEX, parsed.codex); imported.push("Codex"); }
+      // 一次性导入：用完即删，避免之后每次运行把自刷新后的新 token 覆盖回旧的
+      if (imported.length > 0) { try { fm.remove(p); } catch (e) {} }
+    }
+  } catch (e) {}
+
+  // 2) 退而求其次：剪贴板（保留原逻辑）
+  if (imported.length === 0) {
+    let parsed = null;
+    try { parsed = JSON.parse(Pasteboard.paste()); } catch (e) { parsed = null; }
+    if (parsed?.claude?.accessToken) { kcSet(KC_CLAUDE, parsed.claude); imported.push("Claude"); }
+    if (parsed?.codex?.accessToken) { kcSet(KC_CODEX, parsed.codex); imported.push("Codex"); }
+  }
+
   if (imported.length > 0) {
-    let a = new Alert();
-    a.title = "已更新 token";
-    a.message = `已写入：${imported.join(" + ")}。回桌面长按组件刷新即可。`;
-    a.addAction("好");
-    await a.present();
+    if (!config.runsInWidget) { // 组件上下文弹窗会卡→timeout，只在 App 内提示
+      let a = new Alert();
+      a.title = "已更新 token";
+      a.message = `已写入：${imported.join(" + ")}。回桌面长按组件刷新即可。`;
+      a.addAction("好");
+      await a.present();
+    }
     return true;
   }
-  // 剪贴板没有可导入内容：只要至少配置过一个平台就放行（正常运行，不打扰）
+  // 没有可导入内容：只要至少配置过一个平台就放行（正常运行，不打扰）
   if (kcGet(KC_CLAUDE)?.accessToken || kcGet(KC_CODEX)?.accessToken) return true;
-  let a = new Alert();
-  a.title = "需要先导入 token";
-  a.message = "请在 Mac 运行 export-tokens.sh，复制输出的 JSON 到本机剪贴板，再运行本脚本一次。";
-  a.addAction("好");
-  await a.present();
+  if (!config.runsInWidget) {
+    let a = new Alert();
+    a.title = "需要先导入 token";
+    a.message = "请在 Mac 把 aiquota-token.json 放进 Scriptable 的 iCloud 文件夹，再运行本脚本一次。";
+    a.addAction("好");
+    await a.present();
+  }
   return false;
 }
 

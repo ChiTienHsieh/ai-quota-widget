@@ -45,3 +45,11 @@
 - ✅ 重置文案按用户反馈优化：5小时「20:30 恢复」、本周「6月12日 恢复」（比百分比+日期更直观）
 - ✅ 用户决定沿用当前视觉，不另做设计稿；实际效果满意
 - 待办：用户补一张组件截图放进 README/docs（portfolio 收尾）
+
+### 2026-06-22（稳定性迭代 + 根因排查）
+- 现象：CC 额度长期停在旧值不更新、Codex 正常；后期组件直接 `received timeout` 白屏
+- ✅ 修复白屏：给 4 个网络请求加 `timeoutInterval=6`，慢/挂起请求快速失败回退缓存，不再拖垮整个组件（commit d0f28c0）
+- ✅ 导入改造：剪贴板跨设备(通用剪贴板)常失败、从 .txt 复制易带隐藏字符 → 改为优先读 Scriptable iCloud 文件夹里的 `aiquota-token.json`（Mac 写入即自动同步到手机），用完即删；组件上下文不再弹窗（弹窗会卡致 timeout）（commit 45d9021）
+- 🔑 **真正根因**：换新 token 仍不行 → 实测发现**手机连不上 `api.anthropic.com`（被墙），而 `chatgpt.com` 能通** → 故 Codex 一直正常、CC 每次拉取失败退回旧缓存。**与 token 无关，是网络可达性问题。**
+- ✅ 解法：手机代理(Shadowrocket)加规则 `DOMAIN-SUFFIX, anthropic.com, PROXY` 走节点；配好后组件直连 anthropic、实时且不依赖 Mac
+- 经验：单账号下 Mac 主登录与组件共用轮换 refresh token 有冲突隐患；`claude setup-token` 长效 token 缺 `user:profile` scope 无法访问 usage 接口（排查留痕，未采用）

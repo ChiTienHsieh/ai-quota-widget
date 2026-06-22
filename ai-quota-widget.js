@@ -59,6 +59,7 @@ async function bootstrapIfNeeded() {
 // ============ token 刷新 ============
 async function refreshClaude(tok) {
   let req = new Request(CLAUDE_REFRESH_URL);
+  req.timeoutInterval = 6; // 防止刷新请求挂起拖垮整个组件（received timeout）
   req.method = "POST";
   req.headers = { "Content-Type": "application/json" };
   req.body = JSON.stringify({
@@ -78,6 +79,7 @@ async function refreshClaude(tok) {
 }
 async function refreshCodex(tok) {
   let req = new Request(CODEX_REFRESH_URL);
+  req.timeoutInterval = 6; // 同上：刷新挂起也不拖垮组件
   req.method = "POST";
   req.headers = { "Content-Type": "application/json" };
   req.body = JSON.stringify({
@@ -118,6 +120,7 @@ async function fetchClaude() {
   }
   const call = async (t) => {
     let req = new Request("https://api.anthropic.com/api/oauth/usage");
+    req.timeoutInterval = 6; // 慢/挂起请求快速失败→回退缓存，而非拖垮组件
     req.headers = {
       "Authorization": "Bearer " + t.accessToken,
       "anthropic-beta": "oauth-2025-04-20",
@@ -142,6 +145,7 @@ async function fetchCodex() {
   if (!tok) throw new Error("无 Codex token");
   const call = async (t) => {
     let req = new Request("https://chatgpt.com/backend-api/wham/usage");
+    req.timeoutInterval = 6; // 同上
     req.headers = {
       "Authorization": "Bearer " + t.accessToken,
       "chatgpt-account-id": t.accountId,

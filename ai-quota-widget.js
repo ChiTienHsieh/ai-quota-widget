@@ -1,40 +1,42 @@
-// AI 额度小组件 — Scriptable
-// 在 iPhone 桌面/负一屏显示 Claude Code + Codex 的 5小时/本周 剩余额度与重置倒计时
-// 纯手机本地运行，token 存 Keychain，Mac 关机也能用
+// AI Quota Widget — Scriptable
+// Shows Claude Code + Codex 5-hour / weekly remaining quota and reset countdown
+// on the iPhone home screen / Today view.
+// Runs entirely on the phone; tokens live in the Keychain; works even when the Mac is off.
 //
-// 首次使用：见 SETUP.md。简述——
-//   1) 在 Mac 跑 export-tokens.sh，复制输出的 JSON
-//   2) 把 JSON 拷到 iPhone 剪贴板
-//   3) 在 Scriptable 里运行本脚本一次，自动导入 Keychain
-//   4) 桌面添加「中号」Scriptable 组件，选本脚本
+// First-time setup: see SETUP.md. In short —
+//   1) On the Mac, run export-tokens.sh and write its JSON into the Scriptable iCloud
+//      folder as aiquota-token.json (clipboard import is still supported as a fallback)
+//   2) Run this script once in Scriptable — it imports the tokens into the Keychain
+//      and deletes the token file afterwards
+//   3) Add a "Medium" Scriptable widget to the home screen and pick this script
 
-// ============ 配置 ============
-const KC_CLAUDE = "aiquota.claude"; // Keychain key：{accessToken, refreshToken, expiresAt}
-const KC_CODEX = "aiquota.codex";   // Keychain key：{accessToken, refreshToken, accountId}
-const CACHE_FILE = "aiquota-cache.json"; // 拉取失败时回退用的本地缓存
+// ============ Config ============
+const KC_CLAUDE = "aiquota.claude"; // Keychain key: {accessToken, refreshToken, expiresAt}
+const KC_CODEX = "aiquota.codex";   // Keychain key: {accessToken, refreshToken, accountId}
+const CACHE_FILE = "aiquota-cache.json"; // local cache, used as fallback when a fetch fails
 
-// 社区已知的 OAuth client_id 与刷新端点（token 过期时用 refresh_token 续期）
-// 注：非官方，若刷新失败请按 SETUP.md 重新导入 token
+// Community-known OAuth client_id and refresh endpoints (used to renew an expired token via refresh_token)
+// Note: unofficial; if refresh fails, re-import the token per SETUP.md
 const CLAUDE_REFRESH_URL = "https://console.anthropic.com/v1/oauth/token";
 const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const CODEX_REFRESH_URL = "https://auth.openai.com/oauth/token";
 const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 
-// ============ Keychain 读写 ============
+// ============ Keychain read/write ============
 function kcGet(key) {
   if (!Keychain.contains(key)) return null;
   try { return JSON.parse(Keychain.get(key)); } catch (e) { return null; }
 }
 function kcSet(key, obj) { Keychain.set(key, JSON.stringify(obj)); }
 
-// ============ 首次引导：从剪贴板导入 token ============
-// 期望剪贴板里是 export-tokens.sh 输出的 JSON：
+// ============ First-run setup: import token from file/clipboard ============
+// Expects the JSON emitted by export-tokens.sh:
 // { "claude": {accessToken, refreshToken, expiresAt}, "codex": {accessToken, refreshToken, accountId} }
 async function bootstrapIfNeeded() {
   let imported = [];
 
-  // 1) 优先从 iCloud 同步的 token 文件导入（绕开剪贴板，最可靠）
-  //    Mac 端把 aiquota-token.json 放进 Scriptable 的 iCloud 文件夹即自动同步过来
+  // 1) Prefer the iCloud-synced token file (bypasses the clipboard, most reliable)
+  //    On the Mac, drop aiquota-token.json into Scriptable's iCloud folder and it syncs over automatically
   try {
     let fm = FileManager.iCloud();
     let p = fm.joinPath(fm.documentsDirectory(), "aiquota-token.json");
@@ -43,12 +45,12 @@ async function bootstrapIfNeeded() {
       let parsed = JSON.parse(fm.readString(p));
       if (parsed?.claude?.accessToken) { kcSet(KC_CLAUDE, parsed.claude); imported.push("Claude"); }
       if (parsed?.codex?.accessToken) { kcSet(KC_CODEX, parsed.codex); imported.push("Codex"); }
-      // 一次性导入：用完即删，避免之后每次运行把自刷新后的新 token 覆盖回旧的
+      // One-shot import: delete after use, so later runs don't overwrite the freshly self-refreshed token with the old one
       if (imported.length > 0) { try { fm.remove(p); } catch (e) {} }
     }
   } catch (e) {}
 
-  // 2) 退而求其次：剪贴板（保留原逻辑）
+  // 2) Fallback: clipboard (original behavior)
   if (imported.length === 0) {
     let parsed = null;
     try { parsed = JSON.parse(Pasteboard.paste()); } catch (e) { parsed = null; }
@@ -57,31 +59,31 @@ async function bootstrapIfNeeded() {
   }
 
   if (imported.length > 0) {
-    if (!config.runsInWidget) { // 组件上下文弹窗会卡→timeout，只在 App 内提示
+    if (!config.runsInWidget) { // a dialog in widget context hangs -> timeout, so only prompt inside the app
       let a = new Alert();
-      a.title = "已更新 token";
-      a.message = `已写入：${imported.join(" + ")}。回桌面长按组件刷新即可。`;
-      a.addAction("好");
+      a.title = "Token updated";
+      a.message = `Imported: ${imported.join(" + ")}. Long-press the widget on the home screen to refresh.`;
+      a.addAction("OK");
       await a.present();
     }
     return true;
   }
-  // 没有可导入内容：只要至少配置过一个平台就放行（正常运行，不打扰）
+  // Nothing to import: allow running as long as at least one platform was configured before (run normally, don't nag)
   if (kcGet(KC_CLAUDE)?.accessToken || kcGet(KC_CODEX)?.accessToken) return true;
   if (!config.runsInWidget) {
     let a = new Alert();
-    a.title = "需要先导入 token";
-    a.message = "请在 Mac 把 aiquota-token.json 放进 Scriptable 的 iCloud 文件夹，再运行本脚本一次。";
-    a.addAction("好");
+    a.title = "Import a token first";
+    a.message = "On the Mac, drop aiquota-token.json into Scriptable's iCloud folder, then run this script once.";
+    a.addAction("OK");
     await a.present();
   }
   return false;
 }
 
-// ============ token 刷新 ============
+// ============ Token refresh ============
 async function refreshClaude(tok) {
   let req = new Request(CLAUDE_REFRESH_URL);
-  req.timeoutInterval = 6; // 防止刷新请求挂起拖垮整个组件（received timeout）
+  req.timeoutInterval = 6; // keep a hung refresh request from dragging down the whole widget (received timeout)
   req.method = "POST";
   req.headers = { "Content-Type": "application/json" };
   req.body = JSON.stringify({
@@ -90,7 +92,7 @@ async function refreshClaude(tok) {
     client_id: CLAUDE_CLIENT_ID,
   });
   let r = await req.loadJSON();
-  if (!r || !r.access_token) throw new Error("Claude 刷新失败");
+  if (!r || !r.access_token) throw new Error("Claude refresh failed");
   let updated = {
     accessToken: r.access_token,
     refreshToken: r.refresh_token || tok.refreshToken,
@@ -101,7 +103,7 @@ async function refreshClaude(tok) {
 }
 async function refreshCodex(tok) {
   let req = new Request(CODEX_REFRESH_URL);
-  req.timeoutInterval = 6; // 同上：刷新挂起也不拖垮组件
+  req.timeoutInterval = 6; // same as above: a hung refresh won't drag down the widget
   req.method = "POST";
   req.headers = { "Content-Type": "application/json" };
   req.body = JSON.stringify({
@@ -110,7 +112,7 @@ async function refreshCodex(tok) {
     client_id: CODEX_CLIENT_ID,
   });
   let r = await req.loadJSON();
-  if (!r || !r.access_token) throw new Error("Codex 刷新失败");
+  if (!r || !r.access_token) throw new Error("Codex refresh failed");
   let updated = {
     accessToken: r.access_token,
     refreshToken: r.refresh_token || tok.refreshToken,
@@ -120,10 +122,10 @@ async function refreshCodex(tok) {
   return updated;
 }
 
-// ============ 拉取额度 ============
-// 返回统一结构：{ fiveHour:{remain, resetAt}, sevenDay:{remain, resetAt} }
-// remain 为剩余百分比(0-100)，resetAt 为毫秒时间戳
-// 包装：未配置返回 null（不显示该列），失败返回 {error:true}（回退缓存），成功返回数据
+// ============ Fetch quota ============
+// Returns a unified shape: { fiveHour:{remain, resetAt}, sevenDay:{remain, resetAt} }
+// remain is the remaining percentage (0-100), resetAt is a millisecond timestamp
+// Wrapper: not configured -> null (don't show that column); failure -> {error:true} (fall back to cache); success -> data
 async function getClaude() {
   if (!kcGet(KC_CLAUDE)?.accessToken) return null;
   try { return await fetchClaude(); } catch (e) { return { error: true }; }
@@ -135,14 +137,14 @@ async function getCodex() {
 
 async function fetchClaude() {
   let tok = kcGet(KC_CLAUDE);
-  if (!tok) throw new Error("无 Claude token");
-  // 过期则先刷新
+  if (!tok) throw new Error("no Claude token");
+  // refresh first if expired
   if (tok.expiresAt && Date.now() > tok.expiresAt - 60000) {
-    try { tok = await refreshClaude(tok); } catch (e) { /* 用旧 token 试一次 */ }
+    try { tok = await refreshClaude(tok); } catch (e) { /* try once with the old token */ }
   }
   const call = async (t) => {
     let req = new Request("https://api.anthropic.com/api/oauth/usage");
-    req.timeoutInterval = 6; // 慢/挂起请求快速失败→回退缓存，而非拖垮组件
+    req.timeoutInterval = 6; // a slow/hung request fails fast -> fall back to cache, instead of dragging down the widget
     req.headers = {
       "Authorization": "Bearer " + t.accessToken,
       "anthropic-beta": "oauth-2025-04-20",
@@ -154,9 +156,9 @@ async function fetchClaude() {
   };
   let { resp, status } = await call(tok);
   if (status === 401) { tok = await refreshClaude(tok); ({ resp, status } = await call(tok)); }
-  // 没有 five_hour 字段说明拿到的是错误体(401/限流等),抛错让上层回退缓存并标「离线」,
-  // 不能 100-undefined 伪装成「还剩100%」
-  if (!resp || !resp.five_hour) throw new Error("Claude 响应异常 status=" + status);
+  // A missing five_hour field means we got an error body (401/rate-limit/etc.); throw so the caller falls back to cache and marks "offline",
+  // we must not fake "100% remaining" via 100-undefined
+  if (!resp || !resp.five_hour) throw new Error("Claude response error status=" + status);
   return {
     fiveHour: { remain: 100 - (resp.five_hour?.utilization ?? 0), resetAt: Date.parse(resp.five_hour?.resets_at) },
     sevenDay: { remain: 100 - (resp.seven_day?.utilization ?? 0), resetAt: Date.parse(resp.seven_day?.resets_at) },
@@ -164,10 +166,10 @@ async function fetchClaude() {
 }
 async function fetchCodex() {
   let tok = kcGet(KC_CODEX);
-  if (!tok) throw new Error("无 Codex token");
+  if (!tok) throw new Error("no Codex token");
   const call = async (t) => {
     let req = new Request("https://chatgpt.com/backend-api/wham/usage");
-    req.timeoutInterval = 6; // 同上
+    req.timeoutInterval = 6; // same as above
     req.headers = {
       "Authorization": "Bearer " + t.accessToken,
       "chatgpt-account-id": t.accountId,
@@ -179,8 +181,8 @@ async function fetchCodex() {
   };
   let { resp, status } = await call(tok);
   if (status === 401) { tok = await refreshCodex(tok); ({ resp, status } = await call(tok)); }
-  // 同 Claude:没有 rate_limit 字段说明是错误体,抛错回退缓存,不伪装成满额
-  if (!resp || !resp.rate_limit) throw new Error("Codex 响应异常 status=" + status);
+  // Same as Claude: a missing rate_limit field means an error body; throw to fall back to cache, don't fake a full quota
+  if (!resp || !resp.rate_limit) throw new Error("Codex response error status=" + status);
   let rl = resp.rate_limit || {};
   return {
     fiveHour: { remain: 100 - (rl.primary_window?.used_percent ?? 0), resetAt: (rl.primary_window?.reset_at ?? 0) * 1000 },
@@ -188,7 +190,7 @@ async function fetchCodex() {
   };
 }
 
-// ============ 本地缓存（拉取失败时回退） ============
+// ============ Local cache (fallback when a fetch fails) ============
 function cachePath() {
   let fm = FileManager.local();
   return fm.joinPath(fm.documentsDirectory(), CACHE_FILE);
@@ -204,44 +206,44 @@ function loadCache() {
   return null;
 }
 
-// ============ 工具：颜色 / 倒计时文案 ============
+// ============ Helpers: color / countdown text ============
 function colorFor(remain) {
-  if (remain > 50) return new Color("#34c759"); // 绿
-  if (remain > 20) return new Color("#ff9f0a"); // 橙
-  return new Color("#ff3b30");                  // 红
+  if (remain > 50) return new Color("#34c759"); // green
+  if (remain > 20) return new Color("#ff9f0a"); // orange
+  return new Color("#ff3b30");                  // red
 }
 function resetText(resetAt, isWeekly) {
-  // 5小时显示「几点恢复」，周显示「哪天恢复」，最直接
+  // 5-hour shows "resets at <time>", weekly shows "resets on <date>" — most direct
   if (!resetAt || isNaN(resetAt)) return "";
-  if (resetAt - Date.now() <= 0) return "即将恢复";
+  if (resetAt - Date.now() <= 0) return "resetting soon";
   let d = new Date(resetAt);
   if (isWeekly) {
-    return `${d.getMonth() + 1}月${d.getDate()}日 恢复`;
+    return `resets ${d.getMonth() + 1}/${d.getDate()}`;
   }
   let hh = String(d.getHours()).padStart(2, "0");
   let mm = String(d.getMinutes()).padStart(2, "0");
-  return `${hh}:${mm} 恢复`;
+  return `resets ${hh}:${mm}`;
 }
 function agoText(ts) {
   let m = Math.floor((Date.now() - ts) / 60000);
-  if (m <= 0) return "刚刚";
-  if (m < 60) return `${m}分钟前`;
-  return `${Math.floor(m / 60)}小时前`;
+  if (m <= 0) return "just now";
+  if (m < 60) return `${m}m ago`;
+  return `${Math.floor(m / 60)}h ago`;
 }
 
-// ============ 渲染：进度条图片 ============
+// ============ Render: progress-bar image ============
 function barImage(remain, w, h) {
   let ctx = new DrawContext();
   ctx.size = new Size(w, h);
   ctx.opaque = false;
   ctx.respectScreenScale = true;
-  // 底槽
+  // track
   let track = new Path();
   track.addRoundedRect(new Rect(0, 0, w, h), h / 2, h / 2);
   ctx.addPath(track);
   ctx.setFillColor(new Color("#ffffff", 0.18));
   ctx.fillPath();
-  // 填充（剩余比例）
+  // fill (remaining ratio)
   let fw = Math.max(h, w * Math.max(0, Math.min(100, remain)) / 100);
   let fill = new Path();
   fill.addRoundedRect(new Rect(0, 0, fw, h), h / 2, h / 2);
@@ -251,7 +253,7 @@ function barImage(remain, w, h) {
   return ctx.getImage();
 }
 
-// ============ 渲染：单个 Agent 列 ============
+// ============ Render: a single agent column ============
 function renderColumn(stack, title, accent, data, barW) {
   let col = stack.addStack();
   col.layoutVertically();
@@ -275,27 +277,27 @@ function renderColumn(stack, title, accent, data, barW) {
     let pct = line.addText(`${Math.round(d.remain)}%`);
     pct.font = Font.semiboldSystemFont(12);
     pct.textColor = Color.white();
-    // 重置文案
+    // reset text
     let rt = col.addText("   " + resetText(d.resetAt, isWeekly));
     rt.font = Font.systemFont(9);
     rt.textColor = new Color("#ffffff", 0.5);
   };
   row("5h", data.fiveHour, false);
-  row("周", data.sevenDay, true);
+  row("7d", data.sevenDay, true);
 }
 
-// ============ 渲染：组件 ============
-// platforms: [{title, accent, data}]，按数量自适应单列/双列
+// ============ Render: widget ============
+// platforms: [{title, accent, data}] — adapts single/two columns by count
 function buildWidget(platforms, updatedAt, offline) {
   let w = new ListWidget();
   w.backgroundColor = new Color("#1c1c1e");
   w.setPadding(12, 14, 12, 14);
 
-  // 顶部：标题 + 时间戳
+  // top: title + timestamp
   let header = w.addStack();
   header.layoutHorizontally();
   header.centerAlignContent();
-  let title = header.addText("别问了还剩这么点🤏");
+  let title = header.addText("Don't ask, barely any 🤏");
   title.font = Font.boldSystemFont(13);
   title.textColor = Color.white();
   header.addSpacer();
@@ -310,12 +312,12 @@ function buildWidget(platforms, updatedAt, offline) {
   body.topAlignContent();
 
   if (platforms.length === 1) {
-    // 单列：居中、进度条更宽占满
+    // single column: centered, wider bar fills the space
     body.addSpacer();
     renderColumn(body, platforms[0].title, platforms[0].accent, platforms[0].data, 130);
     body.addSpacer();
   } else {
-    // 双列：中间竖分隔
+    // two columns: vertical divider in the middle
     renderColumn(body, platforms[0].title, platforms[0].accent, platforms[0].data, 70);
     body.addSpacer();
     let divider = body.addStack();
@@ -328,17 +330,17 @@ function buildWidget(platforms, updatedAt, offline) {
   return w;
 }
 
-// ============ 主流程 ============
+// ============ Main flow ============
 async function main() {
   let ok = await bootstrapIfNeeded();
   if (!ok) { Script.complete(); return; }
 
-  // 各拉各的：null=未配置(不显示)，{error}=失败(回退缓存)，否则=成功
+  // fetch each independently: null=not configured (don't show), {error}=failed (fall back to cache), else=success
   let [claudeRes, codexRes] = await Promise.all([getClaude(), getCodex()]);
   let cache = loadCache() || {};
   let offline = false;
 
-  // 解析：成功用新数据，失败回退该平台缓存并标记离线
+  // resolve: use fresh data on success, fall back to that platform's cache and mark offline on failure
   const resolve = (res, cached) => {
     if (res === null) return null;
     if (res.error) { offline = true; return cached || null; }
@@ -347,7 +349,7 @@ async function main() {
   let claude = resolve(claudeRes, cache.claude);
   let codex = resolve(codexRes, cache.codex);
 
-  // 写缓存：成功的平台更新，失败的保留旧值
+  // write cache: update the successful platforms, keep old values for the failed ones
   let claudeOk = claudeRes && !claudeRes.error;
   let codexOk = codexRes && !codexRes.error;
   let newCache = {
@@ -357,7 +359,7 @@ async function main() {
   };
   saveCache(newCache);
 
-  // 收集可显示的平台
+  // collect the platforms we can show
   let platforms = [];
   if (claude) platforms.push({ title: "Claude", accent: new Color("#d97757"), data: claude });
   if (codex) platforms.push({ title: "Codex", accent: new Color("#10a37f"), data: codex });
@@ -365,19 +367,19 @@ async function main() {
   if (platforms.length === 0) {
     let w = new ListWidget();
     w.backgroundColor = new Color("#1c1c1e");
-    let t = w.addText("未配置 token 或暂无数据\n运行脚本导入 token");
+    let t = w.addText("No token configured or no data yet\nRun the script to import a token");
     t.font = Font.systemFont(11); t.textColor = Color.white();
     Script.setWidget(w); Script.complete(); return;
   }
 
   let updatedAt = newCache.updatedAt;
   let widget = buildWidget(platforms, updatedAt, offline);
-  widget.refreshAfterDate = new Date(Date.now() + 12 * 60 * 1000); // 12 分钟后刷新
+  widget.refreshAfterDate = new Date(Date.now() + 12 * 60 * 1000); // refresh after 12 minutes
 
   if (config.runsInWidget) {
     Script.setWidget(widget);
   } else {
-    await widget.presentMedium(); // 在 App 内运行时预览
+    await widget.presentMedium(); // preview when run inside the app
   }
   Script.complete();
 }

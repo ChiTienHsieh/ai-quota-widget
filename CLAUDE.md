@@ -1,15 +1,15 @@
-# 项目规则 — AI 额度小组件
+# Project Rules — AI Quota Widget
 
-## 文档同步机制（重要）
-- **每完成执行清单中一项，必须同步更新 `PROJECT.md` 与 `PROGRESS.md`**（任务状态 + 当日进展），保持文档与代码一致
-- 重要决策、接口字段变更、踩坑结论都要落到 PROJECT.md
+## Doc-sync mechanism (important)
+- **Whenever you finish an item on the execution checklist, update `PROJECT.md` and `PROGRESS.md` in the same pass** (task status + that day's progress) so the docs stay in sync with the code
+- Important decisions, interface/field changes, and gotchas all go into PROJECT.md
 
-## 开发规范
-- 主脚本用 JavaScript（Scriptable 运行环境），代码注释用中文
-- 精准修改：只碰必须碰的，不重构没坏的东西
-- 简洁优先：用最少代码解决问题，不做未要求的灵活性
-- 每完成一个模块自动 git commit，commit 信息用中文
+## Development conventions
+- Main script is JavaScript (Scriptable runtime); code comments in English
+- Surgical edits: touch only what must change; don't refactor things that aren't broken
+- Keep it simple: solve the problem with the least code; don't add unrequested flexibility
+- Commit after each module; commit messages in English
 
-## 安全
-- token（Claude / Codex OAuth）一律存 Scriptable Keychain，不明文写入脚本或仓库
-- 仓库 .gitignore 排除任何含真实 token 的本地文件
+## Security
+- Tokens (Claude / Codex OAuth) always live in the Scriptable Keychain, never written in plaintext to the script or the repo
+- The repo .gitignore excludes any local file that may contain a real token

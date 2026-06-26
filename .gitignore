@@ -1,6 +1,10 @@
-# 任何含真实 token 的本地文件
+# Local files that may contain real tokens
 *.token
 *.secret
 secrets.json
 auth.local.*
 .env
+
+# Token file produced by export-tokens.sh (transits iCloud, never commit it)
+aiquota-token.json
+*-token.json

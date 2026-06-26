@@ -1,13 +1,14 @@
 #!/bin/bash
-# 在 Mac 上运行，读取本地 Claude / Codex 的 OAuth token，
-# 输出一段 JSON 供 iPhone Scriptable 一次性导入（存入 Keychain）。
-# 用法：bash export-tokens.sh | pbcopy   # 直接复制到剪贴板
+# Run on a Mac. Reads the local Claude / Codex OAuth tokens and prints a JSON blob
+# for one-shot import by Scriptable on the iPhone (stored in the Keychain).
+# Usage: bash export-tokens.sh > "<Scriptable iCloud folder>/aiquota-token.json"   # preferred
+#    or: bash export-tokens.sh | pbcopy                                            # clipboard fallback
 set -euo pipefail
 
-# Claude：OAuth 存在 macOS 钥匙串 "Claude Code-credentials"
+# Claude: OAuth lives in the macOS Keychain, service "Claude Code-credentials"
 CLAUDE_JSON=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || echo "{}")
 
-# Codex：OAuth 存在 ~/.codex/auth.json
+# Codex: OAuth lives in ~/.codex/auth.json
 CODEX_JSON=$(cat "$HOME/.codex/auth.json" 2>/dev/null || echo "{}")
 
 CLAUDE_JSON="$CLAUDE_JSON" CODEX_JSON="$CODEX_JSON" python3 <<'PY'
@@ -26,10 +27,10 @@ out = {
         "accountId": codex_src.get("account_id", ""),
     },
 }
-# 简单校验
+# Basic validation
 miss = [k for k in ("claude","codex") if not out[k]["accessToken"]]
 if miss:
     import sys
-    print(f"# 警告：未读到 {miss} 的 accessToken，请确认已登录对应客户端", file=sys.stderr)
+    print(f"# Warning: no accessToken found for {miss}; make sure you're signed in to that client", file=sys.stderr)
 print(json.dumps(out, ensure_ascii=False))
 PY

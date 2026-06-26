@@ -1,43 +1,43 @@
-# 双子续杯 🍵
+# Twin Refill 🍵
 
-> 一眼看清 Claude Code + Codex 还能写多久 —— iPhone 桌面小组件，纯本地、零成本。
+> See at a glance how much longer Claude Code + Codex can keep writing — an iPhone home-screen widget, fully local, zero cost.
 >
-> 「双子」= Claude + Codex 两个 Agent，「续杯」= 额度喝完得等下一轮。组件标题：**别问了还剩这么点🤏**
+> "Twin" = the two agents Claude + Codex; "Refill" = when the quota runs dry you wait for the next round. Widget title: **Don't ask, barely any 🤏**
 
-重度用 Claude Code / OpenAI Codex 的人都有「额度焦虑」：当前这个 5 小时窗口还能不能继续猛写代码？跑长任务不能打断去查、人不在电脑前也想知道。
+Heavy users of Claude Code / OpenAI Codex all know the feeling of "quota anxiety": can this 5-hour window still take more hard coding? You can't interrupt a long-running task just to go check, and you want to know even when you're away from the computer.
 
-这个小组件把两个平台的额度做成 iPhone 负一屏卡片，**左滑即见，无需点开、无需刷新**。
+This widget turns both platforms' quota into a card in the iPhone Today view — **glance left, no tapping in, no manual refresh**.
 
 ![widget](docs/screenshot.png)
 
-## 特性
-- **双平台统一视图**：Claude Code + Codex 的 5小时 / 本周 剩余额度 + 恢复时间
-- **只用一个也行**：只配 Claude 或只配 Codex 时自动单列显示
-- **纯手机本地**：用 [Scriptable](https://scriptable.app/)（免费）写的原生组件，零服务器、零费用、无需 Apple 开发者账号
-- **Mac 关机也能看**：手机侧直接调各平台 OAuth 接口，token 存 iPhone Keychain
-- **零打断**：进度条像电量，剩余越少越红，一眼判断
+## Features
+- **Unified two-platform view**: Claude Code + Codex 5-hour / weekly remaining quota + reset time
+- **One platform is fine too**: configure only Claude or only Codex and it auto-switches to a single column
+- **Phone-only, fully local**: a native widget written with [Scriptable](https://scriptable.app/) (free) — zero servers, zero cost, no Apple Developer account needed
+- **Works even when the Mac is off**: the phone calls each platform's OAuth endpoint directly; tokens live in the iPhone Keychain
+- **Zero interruption**: the progress bar reads like a battery gauge — the less remaining, the redder — judge it at a glance
 
-## 环境要求
-- **iPhone**（iOS 14+）—— Scriptable 是 iOS 独占，**安卓无法使用**
-- **macOS** —— 导出 token 的脚本目前只支持 macOS（Win/Linux 欢迎 PR）
-- 已登录 **Claude Code**（桌面版/CLI）和/或 **Codex CLI**（token 才存在本地）
+## Requirements
+- **iPhone** (iOS 14+) — Scriptable is iOS-only, so **Android is not supported**
+- **macOS** — the token-export script currently supports macOS only (PRs welcome for Win/Linux)
+- Signed in to **Claude Code** (desktop/CLI) and/or **Codex CLI** (that's where the tokens live locally)
 
-## 安装
-见 [SETUP.md](SETUP.md)。三步：Mac 导出 token → 拷到手机 → Scriptable 运行一次导入，然后桌面加中号组件。
+## Install
+See [SETUP.md](SETUP.md). Three steps: export the token on the Mac → sync it to the phone → run the script once in Scriptable to import, then add the Medium widget to the home screen.
 
-## 数据来源
-- Claude：`GET https://api.anthropic.com/api/oauth/usage`（token 在 macOS Keychain `Claude Code-credentials`）
-- Codex：`GET https://chatgpt.com/backend-api/wham/usage`（token 在 `~/.codex/auth.json`）
+## Data sources
+- Claude: `GET https://api.anthropic.com/api/oauth/usage` (token in the macOS Keychain `Claude Code-credentials`)
+- Codex: `GET https://chatgpt.com/backend-api/wham/usage` (token in `~/.codex/auth.json`)
 
-两接口只返回百分比 + 重置时间（不含 token 计数），均为**社区逆向的非官方接口**，仅用本机已登录的 token 调用。详见 [PROJECT.md](PROJECT.md)。
+Both endpoints return only a percentage + reset time (no token counts), and both are **community-reverse-engineered, unofficial endpoints** called with tokens already signed in on your own machine. See [PROJECT.md](PROJECT.md).
 
-## 安全说明
-- token 只存在**你自己 iPhone 的 Keychain**，脚本不上传任何第三方服务器
-- 仅用于查询**你自己账号**的额度
-- 接口非官方，平台调整可能导致失效；token 刷新所用 client_id 为社区已知值
+## Security notes
+- Tokens live only in **your own iPhone's Keychain**; the script uploads nothing to any third-party server
+- Used only to query **your own account's** quota
+- The endpoints are unofficial and may break if a platform changes things; the client_id used for token refresh is a community-known value
 
-## 技术栈
-Scriptable (JavaScript) · WidgetKit 中号组件 · iOS Keychain · OAuth token 自动续期
+## Tech stack
+Scriptable (JavaScript) · WidgetKit Medium widget · iOS Keychain · automatic OAuth token renewal
 
 ## License
 MIT

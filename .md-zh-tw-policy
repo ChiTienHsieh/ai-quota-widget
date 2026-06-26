@@ -1,0 +1,3 @@
+# This repository is intentionally maintained in English.
+# Opt out of the global Markdown zh-TW ratio check.
+enabled=false
